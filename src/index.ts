@@ -11,6 +11,7 @@ type Transform = { [key: string]: unknown }
 
 export const transformsFilePath = path.join(
   appRoot.toString(),
+  "storage",
   "validTransforms.json"
 )
 
