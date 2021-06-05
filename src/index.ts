@@ -5,7 +5,7 @@ import appRoot from "app-root-path"
 import fs from "fs-extra"
 import path from "path"
 
-type CreateVariation = () => string
+type CreateVariation = (transform: unknown) => string
 
 type Transform = { [key: string]: unknown }
 
