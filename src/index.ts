@@ -1,17 +1,22 @@
 import { createMacro } from "babel-plugin-macros"
 import crypto from "crypto"
 import * as t from "@babel/types"
+import appRoot from "app-root-path"
+import fs from "fs-extra"
+import path from "path"
 
 type CreateVariation = () => string
 
+type Transform = { [key: string]: unknown }
+
 export const createVariation: CreateVariation = createMacro(
   ({ references }) => {
-    let refs: any = {}
+    let transforms: any = {}
 
     references.createVariation?.forEach(referencePath => {
       referencePath.parentPath.traverse({
         ObjectExpression: objectExpressionPath => {
-          const transform: { [key: string]: unknown } = eval(
+          const transform: Transform = eval(
             `(${objectExpressionPath.getSource()})`
           )
 
@@ -20,13 +25,22 @@ export const createVariation: CreateVariation = createMacro(
             .update(JSON.stringify(transform))
             .digest("hex")
 
-          refs[hash] = transform
+          transforms[hash] = transform
 
           referencePath.parentPath.replaceWith(t.stringLiteral(hash))
+
+          objectExpressionPath.stop()
         }
       })
     })
-    console.log(JSON.stringify(refs))
+
+    const transformsFilePath = path.join(appRoot.toString(), "hey")
+
+    fs.readJSON(transformsFilePath).then(old => {
+      fs.writeJson(transformsFilePath, { ...old, ...transforms })
+    })
+
+    return { keepImport: false }
   }
 )
 
