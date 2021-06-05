@@ -9,6 +9,11 @@ type CreateVariation = () => string
 
 type Transform = { [key: string]: unknown }
 
+export const transformsFilePath = path.join(
+  appRoot.toString(),
+  "validTransforms.json"
+)
+
 export const createVariation: CreateVariation = createMacro(
   ({ references }) => {
     let transforms: any = {}
@@ -34,11 +39,18 @@ export const createVariation: CreateVariation = createMacro(
       })
     })
 
-    const transformsFilePath = path.join(appRoot.toString(), "hey")
+    fs.readJSON(transformsFilePath)
+      .then(existingTransforms => {
+        fs.writeJson(transformsFilePath, {
+          ...existingTransforms,
+          ...transforms
+        })
+      })
+      .catch(async () => {
+        await fs.ensureFile(transformsFilePath)
 
-    fs.readJSON(transformsFilePath).then(old => {
-      fs.writeJson(transformsFilePath, { ...old, ...transforms })
-    })
+        await fs.writeJSON(transformsFilePath, transforms)
+      })
 
     return { keepImport: false }
   }

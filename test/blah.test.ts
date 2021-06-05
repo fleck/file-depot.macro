@@ -1,5 +1,7 @@
 import pluginTester from "babel-plugin-tester"
 import plugin from "babel-plugin-macros"
+import fs from "fs-extra"
+import { transformsFilePath } from "../src"
 
 pluginTester({
   plugin,
@@ -11,7 +13,10 @@ pluginTester({
 
         createVariation({some: "transform"})
       `,
-      output: '"e4e7d76bd2b16c69a7adbed0667a8b0a"'
+      output: '"e4e7d76bd2b16c69a7adbed0667a8b0a"',
+      setup: () => {
+        fs.removeSync(transformsFilePath)
+      }
     }
   }
 })
