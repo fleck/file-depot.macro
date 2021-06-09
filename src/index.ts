@@ -5,7 +5,7 @@ import appRoot from "app-root-path"
 import fs from "fs-extra"
 import path from "path"
 
-type CreateVariation = (transform: unknown) => string
+type Variation = (transform: unknown) => string
 
 type Transform = { [key: string]: unknown }
 
@@ -15,46 +15,44 @@ export const transformsFilePath = path.join(
   "validTransforms.json"
 )
 
-export const createVariation: CreateVariation = createMacro(
-  ({ references }) => {
-    let transforms: any = {}
+export const variation: Variation = createMacro(({ references }) => {
+  let transforms: any = {}
 
-    references.createVariation?.forEach(referencePath => {
-      referencePath.parentPath.traverse({
-        ObjectExpression: objectExpressionPath => {
-          const transform: Transform = eval(
-            `(${objectExpressionPath.getSource()})`
-          )
+  references.variation?.forEach(referencePath => {
+    referencePath.parentPath.traverse({
+      ObjectExpression: objectExpressionPath => {
+        const transform: Transform = eval(
+          `(${objectExpressionPath.getSource()})`
+        )
 
-          const hash = crypto
-            .createHash("md5")
-            .update(JSON.stringify(transform))
-            .digest("hex")
+        const hash = crypto
+          .createHash("md5")
+          .update(JSON.stringify(transform))
+          .digest("hex")
 
-          transforms[hash] = transform
+        transforms[hash] = transform
 
-          referencePath.parentPath.replaceWith(t.stringLiteral(hash))
+        referencePath.parentPath.replaceWith(t.stringLiteral(hash))
 
-          objectExpressionPath.stop()
-        }
+        objectExpressionPath.stop()
+      }
+    })
+  })
+
+  fs.readJSON(transformsFilePath)
+    .then(existingTransforms => {
+      fs.writeJson(transformsFilePath, {
+        ...existingTransforms,
+        ...transforms
       })
     })
+    .catch(async () => {
+      await fs.ensureFile(transformsFilePath)
 
-    fs.readJSON(transformsFilePath)
-      .then(existingTransforms => {
-        fs.writeJson(transformsFilePath, {
-          ...existingTransforms,
-          ...transforms
-        })
-      })
-      .catch(async () => {
-        await fs.ensureFile(transformsFilePath)
+      await fs.writeJSON(transformsFilePath, transforms)
+    })
 
-        await fs.writeJSON(transformsFilePath, transforms)
-      })
+  return { keepImport: false }
+})
 
-    return { keepImport: false }
-  }
-)
-
-export default createVariation
+export default variation
