@@ -36,7 +36,7 @@ type Variant = (
   ...a: (keyof MethodsWithOptionalArgs | Partial<MethodsTakingOneArg>)[]
 ) => string
 
-type Transform = keyof MethodsWithOptionalArgs | Partial<MethodsTakingOneArg>
+export type Transform = keyof MethodsWithOptionalArgs | Partial<MethodsTakingOneArg>
 
 export const transformsFilePath = path.join(
   appRoot.toString(),
