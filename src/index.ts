@@ -4,10 +4,11 @@ import * as t from "@babel/types"
 import appRoot from "app-root-path"
 import fs from "fs-extra"
 import path from "path"
+import assert from "assert"
 
-type Variation = (transform: unknown) => string
+type Variant = (transform: unknown) => string
 
-type Transform = { [key: string]: unknown }
+type Transform = []
 
 export const transformsFilePath = path.join(
   appRoot.toString(),
@@ -15,28 +16,27 @@ export const transformsFilePath = path.join(
   "validTransforms.json"
 )
 
-export const variation: Variation = createMacro(({ references }) => {
+export const variant: Variant = createMacro(({ references }) => {
   let transforms: any = {}
 
-  references.variation?.forEach(referencePath => {
-    referencePath.parentPath.traverse({
-      ObjectExpression: objectExpressionPath => {
-        const transform: Transform = eval(
-          `(${objectExpressionPath.getSource()})`
-        )
+  references.variant?.forEach(referencePath => {
+    assert("name" in referencePath.node)
 
-        const hash = crypto
-          .createHash("md5")
-          .update(JSON.stringify(transform))
-          .digest("hex")
+    const transform: Transform = eval(
+      `${referencePath.parentPath
+        .getSource()
+        .replace(`${referencePath.node.name}(`, "[")
+        .slice(0, -1) + "]"}`
+    )
 
-        transforms[hash] = transform
+    const hash = crypto
+      .createHash("md5")
+      .update(JSON.stringify(transform))
+      .digest("hex")
 
-        referencePath.parentPath.replaceWith(t.stringLiteral(hash))
+    transforms[hash] = transform
 
-        objectExpressionPath.stop()
-      }
-    })
+    referencePath.parentPath.replaceWith(t.stringLiteral(hash))
   })
 
   fs.readJSON(transformsFilePath)
@@ -55,4 +55,4 @@ export const variation: Variation = createMacro(({ references }) => {
   return { keepImport: false }
 })
 
-export default variation
+export default variant

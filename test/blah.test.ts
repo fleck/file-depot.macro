@@ -9,11 +9,11 @@ pluginTester({
   tests: {
     "transform function call to string": {
       code: `
-        import {variation} from '../../file-depot.macro';
+        import {variant} from '../../file-depot.macro';
 
-        variation({some: "transform"})
+        variant({some: "transform"})
       `,
-      output: '"e4e7d76bd2b16c69a7adbed0667a8b0a"',
+      output: '"b763fa71f19b62fd4dde15ee14dfb9f3"',
       setup: () => {
         fs.removeSync(transformsFilePath)
       }
