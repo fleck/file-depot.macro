@@ -5,10 +5,38 @@ import appRoot from "app-root-path"
 import fs from "fs-extra"
 import path from "path"
 import assert from "assert"
+import type { Sharp } from "sharp"
 
-type Variant = (transform: unknown) => string
+type FilterFlags<Base, Condition> = {
+  [Key in keyof Base]: Base[Key] extends Condition ? Key : never
+}
 
-type Transform = []
+type AllowedNames<Base, Condition> = FilterFlags<Base, Condition>[keyof Base]
+
+type SubType<Base, Condition> = Pick<Base, AllowedNames<Base, Condition>>
+
+type MethodsWithOptionalArgs = SubType<Sharp, (a: undefined) => Sharp>
+
+type MethodsWithoutAnyArgs = SubType<Sharp, (a: void) => Sharp>
+
+type ChainableMethodsThatAcceptArgs = SubType<Sharp, (...args: any) => Sharp>
+
+type MethodsAcceptingAtLeastOneArg = Omit<
+  ChainableMethodsThatAcceptArgs,
+  Exclude<keyof MethodsWithoutAnyArgs, undefined>
+>
+
+type Concrete<Type extends { [key: string]: (...args: any) => any }> = {
+  [Property in keyof Type]: Parameters<Type[Property]>[0]
+}
+
+type MethodsTakingOneArg = Concrete<MethodsAcceptingAtLeastOneArg>
+
+type Variant = (
+  ...a: (keyof MethodsWithOptionalArgs | Partial<MethodsTakingOneArg>)[]
+) => string
+
+type Transform = keyof MethodsWithOptionalArgs | Partial<MethodsTakingOneArg>
 
 export const transformsFilePath = path.join(
   appRoot.toString(),
@@ -17,12 +45,12 @@ export const transformsFilePath = path.join(
 )
 
 export const variant: Variant = createMacro(({ references }) => {
-  let transforms: any = {}
+  let transforms: {[hashKey: string]: Transform[]} = {}
 
   references.variant?.forEach(referencePath => {
     assert("name" in referencePath.node)
 
-    const transform: Transform = eval(
+    const transform: Transform[] = eval(
       `${referencePath.parentPath
         .getSource()
         .replace(`${referencePath.node.name}(`, "[")
