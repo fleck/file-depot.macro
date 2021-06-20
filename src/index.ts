@@ -1,4 +1,4 @@
-import { createMacro, MacroError } from "babel-plugin-macros"
+import { createMacro } from "babel-plugin-macros"
 import crypto from "crypto"
 import * as t from "@babel/types"
 import appRoot from "app-root-path"
@@ -17,32 +17,42 @@ type SubType<Base, Condition> = Pick<Base, AllowedNames<Base, Condition>>
 
 type MethodsWithOptionalArgs = SubType<Sharp, (a: undefined) => Sharp>
 
-type MethodsWithoutAnyArgs = SubType<Sharp, (a: void) => Sharp>
-
-type ChainableMethods = SubType<Sharp, (...args: any) => Sharp>
-
-type MethodsAcceptingAtLeastOneArg = Omit<
-  ChainableMethods,
-  Exclude<keyof MethodsWithoutAnyArgs, undefined>
->
-
-type Concrete<Type extends { [key: string]: (...args: any) => any }> = {
-  [Property in keyof Type]?: Type[Property] extends (a: any, b: void) => Sharp
+type MapToAllowMultipleArgs<
+  Type extends { [key: string]: (...args: any) => any }
+> = {
+  [Property in keyof Type]: Type[Property] extends (a: any, b: void) => Sharp
     ? Exclude<Parameters<Type[Property]>[0], undefined>
     :
         | Exclude<Parameters<Type[Property]>[0], undefined>
         | Parameters<Type[Property]>
 }
 
-type MethodsTakingOneArg = Concrete<MethodsAcceptingAtLeastOneArg>
+type SingleProperty<T, K extends keyof T> = K extends any
+  ? { [Prop in K]: T[Prop] }
+  : never
+type UnionOfProperties<T> = { [K in keyof T]: SingleProperty<T, K> }[keyof T]
 
-type Variant = (
-  ...a: (keyof MethodsWithOptionalArgs | MethodsTakingOneArg)[]
-) => string
+type SharpUnion = UnionOfProperties<Sharp>
+
+type ChainableUnion = Extract<
+  SharpUnion,
+  { [key: string]: (...args: any) => Sharp }
+>
+
+type NoArgsUnion = Extract<
+  ChainableUnion,
+  { [key: string]: (args: void) => Sharp }
+>
+
+type AtLeastOneArg = Exclude<ChainableUnion, NoArgsUnion>
+
+type Multi = MapToAllowMultipleArgs<AtLeastOneArg>
 
 export type Transform =
-  | keyof MethodsWithOptionalArgs
-  | Partial<MethodsTakingOneArg>
+  | Exclude<keyof MethodsWithOptionalArgs, undefined>
+  | Multi
+
+type Variant = (...a: Transform[]) => string
 
 export const transformsFilePath = path.join(
   appRoot.toString(),
@@ -69,32 +79,6 @@ export const variant: Variant = createMacro(({ references }) => {
       .digest("hex")
 
     transforms[hash] = transform
-
-    assert("arguments" in referencePath.parentPath.node)
-
-    referencePath.parentPath.node.arguments.forEach(a => {
-      if (a.type === "ObjectExpression") {
-        a.properties.forEach(p => {
-          if (
-            p.type === "ObjectProperty" &&
-            p.value.type === "Identifier" &&
-            p.value.name === "undefined"
-          ) {
-            throw new MacroError(
-              `using undefined here will NOT result in a transform as we
-              serialize these args to JSON. E.g.
-              \`JSON.stringify({ avif: undefined })\`
-              becomes
-              '{}'
-
-              The correct way to call a transform without args is to do
-
-              variant("avif")`
-            )
-          }
-        })
-      }
-    })
 
     referencePath.parentPath.replaceWith(t.stringLiteral(hash))
   })
